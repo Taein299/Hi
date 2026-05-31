@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>오늘의 운세 🥠</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;700&family=Cinzel+Decorative:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d0a05;
+      --gold: #c9a84c;
+      --gold-light: #f0d080;
+      --gold-dim: #7a5f28;
+      --cream: #f5ead8;
+      --glow: rgba(201,168,76,0.35);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      min-height: 100vh;
+      font-family: 'Noto Serif KR', serif;
+      color: var(--cream);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Admin Panel ── */
+    .admin-panel {
+      position: fixed;
+      top: 16px; right: 16px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+    .admin-toggle {
+      width: 28px; height: 28px;
+      background: none;
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 50%;
+      color: rgba(201,168,76,0.3);
+      font-size: .9rem;
+      cursor: pointer;
+      transition: all .3s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .admin-toggle:hover { border-color: var(--gold-dim); color: var(--gold-dim); }
+
+    .admin-box {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(13,10,5,0.95);
+      border: 1px solid rgba(201,168,76,0.2);
+      padding: 12px;
+      border-radius: 4px;
+      backdrop-filter: blur(8px);
+    }
+    .admin-box.open { display: flex; }
+
+    .admin-label {
+      font-size: .6rem;
+      color: var(--gold-dim);
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+    .admin-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .admin-input {
+      background: rgba(201,168,76,0.05);
+      border: 1px solid rgba(201,168,76,0.2);
+      color: var(--cream);
+      font-family: 'Noto Serif KR', serif;
+      font-size: .75rem;
+      padding: 5px 10px;
+      border-radius: 2px;
+      width: 100px;
+      outline: none;
+      letter-spacing: .1em;
+    }
+    .admin-input:focus { border-color: var(--gold-dim); }
+    .admin-input.shake {
+      animation: shake .3s ease;
+      border-color: #c94c4c;
+    }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+    .admin-btn {
+      background: rgba(201,168,76,0.1);
+      border: 1px solid rgba(201,168,76,0.3);
+      color: var(--gold);
+      font-size: .7rem;
+      padding: 5px 10px;
+      border-radius: 2px;
+      cursor: pointer;
+      letter-spacing: .1em;
+      transition: background .2s;
+    }
+    .admin-btn:hover { background: rgba(201,168,76,0.2); }
+    .admin-feedback {
+      font-size: .65rem;
+      text-align: right;
+      height: 14px;
+      transition: color .3s;
+    }
+    .admin-feedback.ok  { color: #6ccf8e; }
+    .admin-feedback.err { color: #c94c4c; }
+
+    /* ── Stars ── */
+    .stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+    .star {
+      position: absolute; width: 2px; height: 2px;
+      background: var(--gold-light); border-radius: 50%;
+      animation: twinkle var(--d,3s) ease-in-out infinite var(--delay,0s);
+      opacity: 0;
+    }
+    @keyframes twinkle {
+      0%,100% { opacity:0; transform:scale(1); }
+      50% { opacity:var(--op,.6); transform:scale(1.4); }
+    }
+
+    /* ── Smoke ── */
+    .smoke-wrap {
+      position: fixed; bottom:0; left:50%; transform:translateX(-50%);
+      pointer-events:none; z-index:0; width:4px;
+    }
+    .smoke-particle {
+      position: absolute; bottom:0; left:50%;
+      width:6px; height:6px; border-radius:50%;
+      background: radial-gradient(circle, rgba(201,168,76,0.15), transparent 70%);
+      animation: rise var(--rd,6s) ease-out infinite var(--rdelay,0s);
+      transform: translateX(-50%);
+    }
+    @keyframes rise {
+      0%   { opacity:.5; transform:translateX(-50%) translateY(0) scale(1); }
+      100% { opacity:0;  transform:translateX(calc(-50% + var(--drift,0px))) translateY(-200px) scale(4); }
+    }
+
+    /* ── Layout ── */
+    .scene {
+      position:relative; z-index:1;
+      display:flex; flex-direction:column;
+      align-items:center; gap:0;
+      padding:2rem 1rem;
+    }
+    .title {
+      font-family:'Cinzel Decorative',serif;
+      font-size:clamp(1.1rem,4vw,2rem);
+      color:var(--gold);
+      letter-spacing:.15em;
+      text-align:center;
+      margin-bottom:.35rem;
+      text-shadow:0 0 30px var(--glow),0 0 60px rgba(201,168,76,0.15);
+      animation:fadeDown .8s ease both;
+    }
+    .subtitle {
+      font-size:.8rem; color:var(--gold-dim);
+      letter-spacing:.3em; text-transform:uppercase;
+      margin-bottom:3rem;
+      animation:fadeDown .8s .15s ease both;
+    }
+    @keyframes fadeDown {
+      from { opacity:0; transform:translateY(-16px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .cookie-area {
+      display:flex; flex-direction:column; align-items:center; gap:2rem;
+      animation:fadeUp 1s .3s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(24px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .cookie-btn {
+      background:none; border:none; cursor:pointer;
+      position:relative; width:180px; height:180px;
+      filter:drop-shadow(0 0 24px var(--glow));
+      transition:filter .3s, transform .3s;
+    }
+    .cookie-btn:hover:not(:disabled) {
+      filter:drop-shadow(0 0 40px rgba(201,168,76,0.6));
+      transform:scale(1.05);
+    }
+    .cookie-btn:disabled { cursor:default; }
+    .cookie-svg { width:100%; height:100%; }
+
+    .half-top, .half-bottom {
+      transform-origin:center center;
+      transition:transform .6s cubic-bezier(.4,0,.2,1), opacity .5s;
+    }
+    .cracked .half-top { transform:translateY(-40px) rotate(-18deg); opacity:0; }
+    .cracked .half-bottom { transform:translateY(40px) rotate(15deg); opacity:0; }
+
+    .ring {
+      position:absolute; inset:-20px; border-radius:50%;
+      border:1px solid transparent;
+      transition:border-color .4s, box-shadow .4s;
+    }
+    .cookie-btn:hover:not(:disabled) .ring {
+      border-color:rgba(201,168,76,0.3);
+      box-shadow:0 0 30px rgba(201,168,76,0.15);
+    }
+
+    .hint {
+      font-size:.75rem; color:var(--gold-dim);
+      letter-spacing:.2em; text-transform:uppercase;
+      transition:opacity .4s;
+    }
+    .hint.hidden { opacity:0; pointer-events:none; }
+
+    /* ── Fortune card ── */
+    .fortune-card {
+      display:none;
+      max-width:420px; width:90vw;
+      background:linear-gradient(135deg,#1e1608 0%,#120f05 100%);
+      border:1px solid var(--gold-dim);
+      border-radius:2px;
+      padding:2.5rem 2rem;
+      text-align:center;
+      position:relative;
+      opacity:0;
+      transform:scale(.85) translateY(20px);
+      transition:opacity .6s .1s, transform .6s .1s;
+      box-shadow:inset 0 0 60px rgba(201,168,76,0.04), 0 0 40px rgba(0,0,0,0.8);
+    }
+    .fortune-card::before, .fortune-card::after {
+      content:''; position:absolute;
+      inset:6px; border:1px solid rgba(201,168,76,0.15);
+      border-radius:1px; pointer-events:none;
+    }
+    .fortune-card::after { inset:10px; border-color:rgba(201,168,76,0.07); }
+    .fortune-card.visible { opacity:1; transform:scale(1) translateY(0); }
+
+    .fortune-ornament {
+      font-size:1.4rem; color:var(--gold);
+      display:block; margin-bottom:1.2rem; letter-spacing:.4em;
+    }
+    .fortune-text {
+      font-size:1.05rem; line-height:1.9;
+      color:var(--cream); font-weight:300; min-height:3rem;
+    }
+    .fortune-date {
+      margin-top:1.5rem; font-size:.7rem;
+      color:var(--gold-dim); letter-spacing:.25em; text-transform:uppercase;
+    }
+    .divider {
+      width:60px; height:1px;
+      background:linear-gradient(90deg,transparent,var(--gold-dim),transparent);
+      margin:1.2rem auto;
+    }
+
+    /* ── Dots ── */
+    .dots span {
+      display:inline-block; width:6px; height:6px;
+      border-radius:50%; background:var(--gold);
+      margin:0 3px; animation:bounce .8s ease-in-out infinite;
+    }
+    .dots span:nth-child(2) { animation-delay:.15s; }
+    .dots span:nth-child(3) { animation-delay:.3s; }
+    @keyframes bounce {
+      0%,80%,100% { transform:translateY(0); opacity:.4; }
+      40% { transform:translateY(-8px); opacity:1; }
+    }
+
+    .reset-note {
+      margin-top:2rem; font-size:.7rem;
+      color:rgba(201,168,76,0.3); letter-spacing:.15em; text-align:center;
+    }
+
+    /* ── Particles ── */
+    .particles { position:fixed; inset:0; pointer-events:none; z-index:5; }
+    .particle {
+      position:absolute; width:4px; height:4px;
+      border-radius:50%; background:var(--gold-light); opacity:0;
+    }
+    @keyframes burst {
+      0%   { opacity:1; transform:translate(0,0) scale(1); }
+      100% { opacity:0; transform:translate(var(--tx),var(--ty)) scale(0); }
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(20px);
+      background:rgba(20,15,5,0.95);
+      border:1px solid var(--gold-dim);
+      color:var(--gold);
+      font-size:.75rem; letter-spacing:.15em;
+      padding:10px 20px; border-radius:2px;
+      opacity:0; transition:opacity .3s, transform .3s;
+      pointer-events:none; white-space:nowrap; z-index:200;
+    }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+<div class="smoke-wrap" id="smoke"></div>
+<div class="particles" id="particles"></div>
+
+<!-- Admin panel -->
+<div class="admin-panel">
+  <button class="admin-toggle" id="adminToggle" title="관리자">⚙</button>
+  <div class="admin-box" id="adminBox">
+    <div class="admin-label">관리자 비밀번호</div>
+    <div class="admin-row">
+      <input class="admin-input" id="adminInput" type="password" placeholder="••••" maxlength="20" />
+      <button class="admin-btn" id="adminBtn">초기화</button>
+    </div>
+    <div class="admin-feedback" id="adminFeedback"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="scene">
+  <h1 class="title">오늘의 운세</h1>
+  <p class="subtitle">Fortune of the Day</p>
+
+  <div class="cookie-area" id="cookieArea">
+    <button class="cookie-btn" id="cookieBtn" title="포춘쿠키를 열어보세요">
+      <div class="ring"></div>
+      <svg class="cookie-svg" id="cookieSvg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g class="half-bottom">
+          <ellipse cx="100" cy="130" rx="72" ry="30" fill="#8B5E1A" opacity=".95"/>
+          <ellipse cx="100" cy="125" rx="68" ry="26" fill="#A3721F"/>
+          <ellipse cx="100" cy="122" rx="60" ry="20" fill="#B8832A" opacity=".5"/>
+          <path d="M 55 128 Q 100 118 145 128" stroke="#7a4e12" stroke-width="1.2" fill="none" opacity=".5"/>
+          <path d="M 62 133 Q 100 125 138 133" stroke="#7a4e12" stroke-width=".8" fill="none" opacity=".4"/>
+        </g>
+        <g class="half-bottom">
+          <rect x="78" y="110" width="44" height="9" rx="2" fill="#f5ead8" opacity=".9"/>
+          <line x1="84" y1="114" x2="116" y2="114" stroke="#c9a84c" stroke-width=".6" opacity=".6"/>
+        </g>
+        <g class="half-top">
+          <ellipse cx="100" cy="80" rx="72" ry="30" fill="#8B5E1A" opacity=".95"/>
+          <ellipse cx="100" cy="75" rx="68" ry="26" fill="#A3721F"/>
+          <ellipse cx="100" cy="72" rx="60" ry="20" fill="#B8832A" opacity=".5"/>
+          <path d="M 55 78 Q 100 68 145 78" stroke="#7a4e12" stroke-width="1.2" fill="none" opacity=".5"/>
+          <path d="M 62 83 Q 100 75 138 83" stroke="#7a4e12" stroke-width=".8" fill="none" opacity=".4"/>
+          <ellipse cx="80" cy="72" rx="3" ry="1.5" fill="#6b4010" opacity=".6" transform="rotate(-20 80 72)"/>
+          <ellipse cx="115" cy="70" rx="3" ry="1.5" fill="#6b4010" opacity=".6" transform="rotate(10 115 70)"/>
+          <ellipse cx="95" cy="65" rx="3" ry="1.5" fill="#6b4010" opacity=".5" transform="rotate(-5 95 65)"/>
+          <ellipse cx="105" cy="80" rx="2.5" ry="1.2" fill="#6b4010" opacity=".5" transform="rotate(15 105 80)"/>
+        </g>
+        <path d="M 40 105 Q 70 98 100 105 Q 130 112 160 105"
+              stroke="#5a3a08" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>
+      </svg>
+    </button>
+    <p class="hint" id="hint">✦ 쿠키를 눌러 오늘의 운세를 확인하세요 ✦</p>
+  </div>
+
+  <div class="fortune-card" id="fortuneCard">
+    <span class="fortune-ornament">✦ ✦ ✦</span>
+    <div class="fortune-text" id="fortuneText"></div>
+    <div class="divider"></div>
+    <div class="fortune-date" id="fortuneDate"></div>
+  </div>
+
+  <p class="reset-note" id="resetNote"></p>
+</div>
+
+<script>
+  const ADMIN_PW   = '1234';
+  const STORAGE_KEY = 'fortune_v1';
+
+  /* ── Stars ── */
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    s.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;--d:${2+Math.random()*4}s;--delay:${Math.random()*5}s;--op:${0.3+Math.random()*0.5};width:${Math.random()<.3?3:2}px;height:${Math.random()<.3?3:2}px;`;
+    starsEl.appendChild(s);
+  }
+
+  /* ── Smoke ── */
+  const smokeEl = document.getElementById('smoke');
+  for (let i = 0; i < 6; i++) {
+    const p = document.createElement('div');
+    p.className = 'smoke-particle';
+    p.style.cssText = `--rd:${5+Math.random()*4}s;--rdelay:${Math.random()*6}s;--drift:${(Math.random()-.5)*40}px`;
+    smokeEl.appendChild(p);
+  }
+
+  /* ── Helpers ── */
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      if (obj.date !== todayStr()) return null;
+      return obj;
+    } catch { return null; }
+  }
+  function saveState(fortune) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: todayStr(), fortune }));
+  }
+  function clearState() {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  /* ── Elements ── */
+  const btn          = document.getElementById('cookieBtn');
+  const cookieSvg    = document.getElementById('cookieSvg');
+  const hint         = document.getElementById('hint');
+  const card         = document.getElementById('fortuneCard');
+  const fortuneText  = document.getElementById('fortuneText');
+  const fortuneDate  = document.getElementById('fortuneDate');
+  const resetNote    = document.getElementById('resetNote');
+
+  /* ── Admin panel ── */
+  const adminToggle   = document.getElementById('adminToggle');
+  const adminBox      = document.getElementById('adminBox');
+  const adminInput    = document.getElementById('adminInput');
+  const adminBtn      = document.getElementById('adminBtn');
+  const adminFeedback = document.getElementById('adminFeedback');
+
+  adminToggle.addEventListener('click', () => {
+    adminBox.classList.toggle('open');
+    if (adminBox.classList.contains('open')) adminInput.focus();
+    adminInput.value = '';
+    adminFeedback.textContent = '';
+    adminFeedback.className = 'admin-feedback';
+  });
+
+  adminInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') adminBtn.click();
+  });
+
+  adminBtn.addEventListener('click', () => {
+    const pw = adminInput.value.trim();
+    if (pw === ADMIN_PW) {
+      clearState();
+      adminFeedback.textContent = '✓ 초기화 완료';
+      adminFeedback.className = 'admin-feedback ok';
+      adminInput.value = '';
+      setTimeout(() => {
+        adminBox.classList.remove('open');
+        adminFeedback.textContent = '';
+        location.reload();
+      }, 800);
+    } else {
+      adminFeedback.textContent = '✗ 비밀번호 오류';
+      adminFeedback.className = 'admin-feedback err';
+      adminInput.classList.add('shake');
+      adminInput.value = '';
+      setTimeout(() => adminInput.classList.remove('shake'), 400);
+    }
+  });
+
+  /* ── Init ── */
+  const saved = loadState();
+  if (saved) {
+    showSavedFortune(saved.fortune);
+  } else {
+    btn.addEventListener('click', onCookieClick);
+  }
+
+  function showSavedFortune(text) {
+    btn.disabled = true;
+    hint.classList.add('hidden');
+    cookieSvg.classList.add('cracked');
+    showCard(text);
+    const midnight = new Date(); midnight.setHours(24,0,0,0);
+    const diff = midnight - Date.now();
+    const h = Math.floor(diff/3600000);
+    const m = Math.floor((diff%3600000)/60000);
+    resetNote.textContent = `다음 운세까지 ${h}시간 ${m}분 남았습니다`;
+  }
+
+  /* ── Cookie click ── */
+  async function onCookieClick() {
+    btn.removeEventListener('click', onCookieClick);
+    btn.disabled = true;
+    hint.classList.add('hidden');
+    cookieSvg.classList.add('cracked');
+    burstParticles();
+
+    await sleep(500);
+    card.style.display = 'block';
+    fortuneText.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>';
+    fortuneDate.textContent = '';
+    requestAnimationFrame(() => card.classList.add('visible'));
+
+    const fortune = await fetchFortune();
+    saveState(fortune);
+    showCard(fortune);
+  }
+
+  function showCard(text) {
+    card.style.display = 'block';
+    requestAnimationFrame(() => card.classList.add('visible'));
+    fortuneText.textContent = text;
+    const d = new Date();
+    const days = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
+    fortuneDate.textContent = `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${days[d.getDay()]}`;
+  }
+
+  /* ── API ── */
+  async function fetchFortune() {
+    const today = todayStr();
+    const prompt = `오늘(${today})의 운세를 한국어로 알려주세요.\n3~5문장 정도로, 따뜻하고 신비로운 분위기로 작성해주세요.\n오늘 하루의 전반적인 운, 주의할 점, 행운의 조언을 담아주세요.\n마크다운이나 특수기호 없이 순수한 문장으로만 답해주세요.`;
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{ role:'user', content: prompt }]
+        })
+      });
+      const data = await res.json();
+      if (data.content?.[0]?.text) return data.content[0].text.trim();
+      throw new Error('no content');
+    } catch {
+      const fallbacks = [
+        '오늘은 새로운 시작을 알리는 날입니다. 작은 변화에 주목하세요. 오랫동안 기다려온 소식이 예상치 못한 방향에서 찾아올 수 있습니다. 마음을 열고 주변의 인연을 소중히 여기면 좋은 기운이 함께할 것입니다.',
+        '바람이 방향을 바꾸듯, 오늘은 생각의 전환이 필요한 날입니다. 고집을 내려놓으면 더 넓은 길이 보입니다. 저녁 무렵 뜻밖의 즐거움이 찾아올 테니 기대해보세요.',
+        '오늘의 별자리는 당신에게 용기를 속삭입니다. 미뤄두었던 일을 오늘 시작하기에 좋은 날입니다. 작은 친절 하나가 큰 행운으로 돌아올 것입니다.'
+      ];
+      return fallbacks[Math.floor(Math.random()*fallbacks.length)];
+    }
+  }
+
+  /* ── Particles ── */
+  function burstParticles() {
+    const container = document.getElementById('particles');
+    const rect = btn.getBoundingClientRect();
+    const cx = rect.left + 90, cy = rect.top + 90;
+    for (let i = 0; i < 28; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const angle = (i/28)*Math.PI*2;
+      const dist = 60+Math.random()*80;
+      p.style.cssText = `left:${cx}px;top:${cy}px;--tx:${Math.cos(angle)*dist}px;--ty:${Math.sin(angle)*dist}px;width:${2+Math.random()*4}px;height:${2+Math.random()*4}px;background:${Math.random()<.5?'#c9a84c':'#f0d080'};animation:burst ${.6+Math.random()*.6}s ease-out forwards;animation-delay:${Math.random()*.1}s;`;
+      container.appendChild(p);
+      setTimeout(() => p.remove(), 1500);
+    }
+  }
+</script>
+</body>
+</html>
